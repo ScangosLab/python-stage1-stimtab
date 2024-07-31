@@ -5,6 +5,11 @@ Version: v1.0
 
 Requirements: python>=3.8, pandas.
 
+## Overview:
+Code works using 2 python files: `tools.py` and `filter.py`. Custom functions in `tools.py` will be imported and applied in `filter.py`. Be sure to open `filter.py` on an editing tool and modify the values of the user-specified inputs according to your preferences. Save your changes and on the same command line run `python filter.py`. 
+
+Code reads through each row of a source dataframe and identifies the start and stop of a trial/block of stimulation based on the user-specified criteria. It then curates a new dataframe with trial metadata using identifiers previously assigned by the filter.    
+
 ## User-specified variables/inputs:
 
 * `OUTPUT_DIR`: string, path to directory in server where output CSV will be saved.
@@ -35,4 +40,34 @@ Custom functions called in "filter.py":
 Code where you can specify user inputs and apply custom functions to obtain output CSV. This is the only code you need to edit and run on the terminal.
 
 ## Output CSV file:
-[TO DO: add description of each column in output file]  
+Output file will be saved in `OUTPUT_DIR` as `patient_id_Stage1_FilteredEfficacyTrials_%m%d%Y_%H%M%S`.csv where `%m%d%Y_%H%M%S` indicates date and time of file creation. 
+
+Each row represents a trial/block of stimulation that qualified the filter criteria. There are 22 columns associated with stimulation and depending on `patient_id`, there will be a variable number of columns associated with behavioral scores (surveys). 
+
+### Columns associated with stimulation parameters applied on each trial:
+
+* `EventDate`: Date trial/block was conducted
+* `EventStart`: Start of the first train of stimulation delivered within the trial. 
+* `EventStop`: End of the last train of stimulation delivered within the trial.
+* `EventType`: 
+* `EventCondition`: Indicates type of stimulation testing conducted. For stim efficacy trials it's NaN.
+* `StimCondition`: Indicates whether a trial is active (amplitude>0) or sham (amplitude=0).
+* `Lead`: Label of intracranial electrode.
+* `Channels`: Pair of contacts used for stimulation.
+* `PosContact`: Positive contact used for stimulation.
+* `NegContact`: Negative contact used for stimulation. 
+* `AmplitudeRange`: List of amplitude values used for stimulation (mA).
+* `AmplitudeMean`: Mean amplitude value used for stimulation (mA). 
+* `PulseDuration`: Pulse width programmed for stimulation (for all patients is 100 us)
+* `TrainDurationRange`: List of times programmed for train duration (seconds).
+* `TrainDurationMean`: Mean train duration used for stimulation (seconds).
+* `TrainNumber`: Number of trains of stimulation delivered within a trial. 
+* `Frequency`: Frequency used for stimulation (Hz)
+* `TotalStimDelivered`: Total duration of stimulation delivered within a trial (sum of all individual train durations).
+* `PrevStimStop`: End of the last train of stimulation before the current trial starts (`EventStart`)   
+* `NextStimStart`: Start of the first train of stimulation after the current trial ends (`EventStop`)
+* 'DiffPrevStim`: Difference in seconds between `EventStart` and `PrevStimStop`. Indicates how many seconds of NO stim were recorded before the trial started.
+* `DiffNextStim`: Difference in seconds between `NextStimStart` and `EventStop`. Indicates how many seconds of NO stim were recorded after the trial ended.
+
+### Columns associated with surveys identified for each trial:
+[PENDING: Add description]
