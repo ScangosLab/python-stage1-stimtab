@@ -43,7 +43,7 @@ output_df = ConfigOutputData(patient_id, tagged_df, total_stim_duration, pre_sti
 now = datetime.datetime.now()
 creation_timestamp = now.strftime('%m%d%Y_%H%M%S')
 outfile_name = f'{patient_id}_Stage1_FilteredEfficacyTrials_{creation_timestamp}.csv'
-output_df.to_csv(pathlib.Path(OUTPUT_DIR, outfile_name))
+output_df.to_csv(pathlib.Path(OUTPUT_DIR, outfile_name), index=False)
 
 
 """End of code
