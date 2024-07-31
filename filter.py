@@ -38,12 +38,17 @@ post_stim_duration = 65.0 #seconds
 raw_df = LoadRawData(patient_id)
 input_df = ConfigInputData(raw_df)
 tagged_df = RunFilter(input_df, lead_on, channels_on, frequency_on, amplitude_on, train_duration_on, time_threshold)
-output_df = ConfigOutputData(patient_id, tagged_df, total_stim_duration, pre_stim_duration, post_stim_duration)
+pre_output_df = ConfigOutputData(patient_id, tagged_df, total_stim_duration, pre_stim_duration, post_stim_duration)
+output_df = pre_output_df.drop(columns=['EventType', 'EventCondition'])
+
+del raw_df
+del input_df
+del pre_output_df
 
 now = datetime.datetime.now()
 creation_timestamp = now.strftime('%m%d%Y_%H%M%S')
 outfile_name = f'{patient_id}_Stage1_FilteredEfficacyTrials_{creation_timestamp}.csv'
-output_df.to_csv(pathlib.Path(OUTPUT_DIR, outfile_name))
+output_df.to_csv(pathlib.Path(OUTPUT_DIR, outfile_name), index=False)
 
 
 """End of code
