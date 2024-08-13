@@ -10,7 +10,7 @@ import re
 
 def LoadRawData(patient_id):
     if patient_id == 'PR01':
-        sheet_url = 'https://docs.google.com/spreadsheets/d/1h6AoXkKo2ePL8k2CfTTGm9AlZdunyaJ1vZuU82K2gEg/edit?gid=0'
+        sheet_url = 'https://docs.google.com/spreadsheets/d/1h6AoXkKo2ePL8k2CfTTGm9AlZdunyaJ1vZuU82K2gEg/edit#gid=0'
     if patient_id == 'PR03':
         sheet_url = 'https://docs.google.com/spreadsheets/d/1h6AoXkKo2ePL8k2CfTTGm9AlZdunyaJ1vZuU82K2gEg/edit#gid=582689872'
     if patient_id == 'PR04':
@@ -213,10 +213,10 @@ def ConfigOutputData(patient_id, DataFrame, total_stim_duration, pre_stim_durati
                               'Channels': df_init.Channels[trial_start_idx[i]],
                               'PosContact': df_init.PosContact[trial_start_idx[i]],
                               'NegContact': df_init.NegContact[trial_start_idx[i]],
-                              'AmplitudeRange': list(df_init.Amplitude.unique()),
+                              'AmplitudeRange': list(df_init.Amplitude),
                               'AmplitudeMean': df_init.Amplitude.mean(),
                               'PulseDuration': df_init.PulseDuration[trial_start_idx[i]],
-                              'TrainDurationRange': list(df_init.TrainDuration.unique()),
+                              'TrainDurationRange': list(df_init.TrainDuration),
                               'TrainDurationMean': df_init.TrainDuration.mean(),
                               'TrainNumber': len(df_init),
                               'Frequency': df_init.Frequency[trial_start_idx[i]],
