@@ -7,6 +7,8 @@ DO NOT MODIFY
 
 import pandas as pd
 import re
+import pathlib
+import os
 
 def LoadRawData(patient_id):
     if patient_id == 'PR01':
@@ -300,6 +302,57 @@ def ConfigOutputData(patient_id, DataFrame, total_stim_duration, pre_stim_durati
 
     return CuratedDataFrame
 
+##custom function to load NK annotations in a clean dataframe
+def LoadNKData(patient_id, FileFormat):
+    main_path = pathlib.Path(f'/data_store0/presidio/nihon_kohden/', patient_id)
+    if patient_id == 'PR01':
+        nk_dir = 'NK_Annotations'
+    if (patient_id == 'PR03') or (patient_id == 'PR05') or (patient_id == 'PR06'):
+        nk_dir = 'NK_annotations'
+    if patient_id == 'PR04':
+        nk_dir = 'NK_annotations_2'
+    nk_path = pathlib.Path(main_path, nk_dir)
+
+    FileNames = sorted(filter(lambda x: True if FileFormat in x else False, os.listdir(nk_path)))
+    FilePaths = []
+    for i in range(len(FileNames)):
+        FilePaths.append(pathlib.Path(nk_path, FileNames[i]))
+
+    ##Create dataframe where each row represents a timestamped annotation saved by the NK. 
+    df_IN = []
+    for path in FilePaths:
+        df_OUT = pd.read_csv(path,
+                             delimiter='\t',
+                             header=None,
+                             names=['EventType', 'EventTimestamp', 'FileID'])
+        df_IN.append(df_OUT)
+    df_OUT = pd.concat(df_IN).reset_index(drop=True)
+    df_OUT.EventTimestamp = pd.to_datetime(df_OUT.EventTimestamp, format='%Y/%m/%d %H:%M:%S %f')
+    
+    return df_OUT
+
+
+def AddBoxDisconnects(Subject, DataFrame):
+    nk_df = LoadNKData(Subject, 'csv')
+    
+    window_start = list(DataFrame.PrevStimStop)
+    window_stop = list(DataFrame.NextStimStart)
+
+    disconnects = list(nk_df.loc[nk_df['EventType'].str.contains('Mini junction box disconnected')].EventTimestamp)
+    reconnects = list(nk_df.loc[nk_df['EventType'].str.contains('Mini junction box connected')].EventTimestamp)
+
+    junction_box_disconnects = []
+    junction_box_reconnects = []
+    for i in range(len(window_start)):
+        junction_box_disconnects.append([x for x in disconnects if (x>window_start[i]) & (x<window_stop[i])])
+        junction_box_reconnects.append([x for x in reconnects if (x>window_start[i]) & (x<window_stop[i])])
+
+    NewDataFrame = DataFrame.copy()
+
+    NewDataFrame.insert(20, 'JunctionBoxDisconnects', junction_box_disconnects)
+    NewDataFrame.insert(21, 'JunctionBoxReconnects', junction_box_reconnects)
+
+    return NewDataFrame
 
 """End of code
 
