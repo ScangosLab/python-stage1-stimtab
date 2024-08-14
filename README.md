@@ -1,7 +1,7 @@
 # python-stage1-stimtab
 Tool that allows tabulation of stage 1 stimulation efficacy data based on user-specified criteria.
 
-Version: v1.0
+Version: v2.0
 
 Requirements: python>=3.8, pandas.
 
@@ -17,7 +17,7 @@ Code reads through each row of a source dataframe and identifies the start and s
 * `lead_on`: boolean, if set to True, trials/blocks will be identified by trains of stimulation delivered in the same lead, regardless of contact number. Mutually exclusive with variable `channels_on`.
 * `channels_on`: boolean, if set to True, trials/blocks will be identified by trains of stimulations delivered in the same pair of contacts. For example, after 8 trains of stimulation in LVC2-3 the filter detects that the next train of stimulation is in LVC3-4. Then the filter will assign the last train in LVC2-3 as the end of an LVC2-3 trial, and the first train of LVC3-4 as the start of a new trial. Mutually exclusive with `lead_on`.
 * `frequency_on`: boolean, if set to True, frequency of stimulation will be considered as a criteria for trials/blocks identification. Optional and can be used in addition to other booleans. 
-* `amplitude_on`: boolean, if set to True, amplitude of stimulation will be considered as criteria for trials/blocks identification. Optional and can be used in addition to other booleans.
+* `amplitude_on`: boolean,NextStimStart if set to True, amplitude of stimulation will be considered as criteria for trials/blocks identification. Optional and can be used in addition to other booleans.
 * `train_duration_on`: boolean, if set to True, train duration (e.g. 10s, 20s, 120s) will be considered as criteria for trials/blocks identification. Optional and can be used in addition to other booleans. 
 * `time_threshold`: int or float, indicates maximum time in seconds between the end and start of trains of stimulation that have same filter parameters. 
 * `total_stim_duration`: int or float, indicates minimum total time in seconds of stimulation delivered within a trial/block. This is applied AFTER trials/blocks have been identified and labeled. Optional and can be used if you only want to output trials/blocks in which we delivered X seconds or more of total stimulation, otherwise set to 0.
@@ -36,6 +36,10 @@ Custom functions called in "filter.py":
 
 `ConfigOutputData`: Creates output CSV file with trials/blocks that meet user-specified criteria of `total_stim_duration`, `pre_stim_duration` and `post_stim_duration`. After selecting qualifying trials/blocks, it will add the closest survey before each trial/block starts and the closest survey after each trial/block ends.  
 
+`LoadNKData`: Load NK annotations in dataframe based on `patient_id` (it considers differences in folder naming).
+
+`AddBoxDisconnects`: Adds a column with disconnects timestamps and a column with reconnects timestamps between `PrevStimStop` and `NextStimStart`.
+
 ## filter.py
 Code where you can specify user inputs and apply custom functions to obtain output CSV. This is the only code you need to edit and run on the terminal.
 
@@ -49,8 +53,6 @@ Each row represents a trial/block of stimulation that qualified the filter crite
 * `EventDate`: Date trial/block was conducted
 * `EventStart`: Start of the first train of stimulation delivered within the trial. 
 * `EventStop`: End of the last train of stimulation delivered within the trial.
-* `EventType`: 
-* `EventCondition`: Indicates type of stimulation testing conducted. For stim efficacy trials it's NaN.
 * `StimCondition`: Indicates whether a trial is active (amplitude>0) or sham (amplitude=0).
 * `Lead`: Label of intracranial electrode.
 * `Channels`: Pair of contacts used for stimulation.
@@ -68,6 +70,8 @@ Each row represents a trial/block of stimulation that qualified the filter crite
 * `NextStimStart`: Start of the first train of stimulation after the current trial ends (`EventStop`)
 * `DiffPrevStim`: Difference in seconds between `EventStart` and `PrevStimStop`. Indicates how many seconds of NO stim were recorded before the trial started.
 * `DiffNextStim`: Difference in seconds between `NextStimStart` and `EventStop`. Indicates how many seconds of NO stim were recorded after the trial ended.
+* `JunctionBoxDisconnects`:
+* `JunctionBoxReconnects`:
 
 ### Columns associated with surveys identified for each trial:
 [PENDING: Add description]
