@@ -1,6 +1,6 @@
 """ filter.py
 tool to create table with discrete stim trials/block metadata. output in csv format.
-version v.1.0
+version v2.0
 
 """
 

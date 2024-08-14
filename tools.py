@@ -1,6 +1,6 @@
 """ tools.py
 custom functions applied in filter.py
-version v.1.0
+version v2.0
 DO NOT MODIFY
 
 """
