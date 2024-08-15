@@ -72,10 +72,8 @@ Each row represents a trial/block of stimulation that qualified the filter crite
 * `PreTrial_NoStim_Duration`: Indicates how many seconds of NO stim were recorded before a trial started.
 * `PostTrial_NoStim_Duration`: Indicates how many seconds of NO stim were recorded after a trial ended.
 * `TrialType`: If `single_train_trial`, trial has 1 train of stimulation, if `multi_train_trial`, trial has >1 train of stimulation.
-* `JunctionBoxDisconnects`: If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are not 0, it will indicate any disconnection of the mini junction box that happened between \
- `TrialStart`-`pre_trial_nostim_duration` and `TrialStop`+`post_trial_nostim_duration`. If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are 0, by default it will indicate any disconnection that happened between 2 min before and 2 min after the trial.
-* `JunctionBoxReconnects`: If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are not 0, it will indicate any reconnection of the mini junction box that happened between \
- `TrialStart`-`pre_trial_nostim_duration` and `TrialStop`+`post_trial_nostim_duration`. If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are 0, by default it will indicate any reconnection that happened between 2 min before and 2 min after the trial.
+* `JunctionBoxDisconnects`: If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are not 0, it will indicate any disconnection of the mini junction box that happened between `TrialStart`-`pre_trial_nostim_duration` and `TrialStop`+`post_trial_nostim_duration`. If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are 0, by default it will indicate any disconnection that happened between 2 min before and 2 min after the trial.
+* `JunctionBoxReconnects`: If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are not 0, it will indicate any reconnection of the mini junction box that happened between `TrialStart`-`pre_trial_nostim_duration` and `TrialStop`+`post_trial_nostim_duration`. If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are 0, by default it will indicate any reconnection that happened between 2 min before and 2 min after the trial.
 
 ### Columns associated with surveys identified for each trial:
 
