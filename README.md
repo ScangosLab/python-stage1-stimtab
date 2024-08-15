@@ -37,11 +37,11 @@ Custom functions called in "filter.py":
 
 `RunFilter2`:   
 
-`ConfigOutputData`: Creates output CSV file with trials/blocks that meet user-specified criteria of `total_stim_duration`, `pre_stim_duration` and `post_stim_duration`. After selecting qualifying trials/blocks, it will add the closest survey before each trial/block starts and the closest survey after each trial/block ends.  
+`ConfigOutputData`: Creates output CSV file with trials/blocks that meet user-specified criteria of `total_stim_duration`, `pre_trial_nostim_duration` and `post_trial_nostim_duration`. After selecting qualifying trials/blocks, it will add the closest survey before each trial/block starts and the closest survey after each trial/block ends.  
 
 `LoadNKData`: Load NK annotations in dataframe based on `patient_id` (it considers differences in folder naming).
 
-`AddBoxDisconnects`: Adds a column with disconnects timestamps and a column with reconnects timestamps between `PrevStimStop` and `NextStimStart`.
+`AddBoxDisconnects`: Adds a column with disconnects timestamps and a column with reconnects timestamps.
 
 ## filter.py
 Code where you can specify user inputs and apply custom functions to obtain output CSV. This is the only code you need to edit and run on the terminal.
