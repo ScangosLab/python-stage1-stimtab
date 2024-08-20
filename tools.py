@@ -106,7 +106,7 @@ def AssignTags(DataFrame, lead_on, channels_on, frequency_on, amplitude_on, trai
 
         if (frequency_on == True) & (amplitude_on == False) & (train_duration_on == False):
             filter_tags = tags_init \
-            + '_' + pd.Series([str(int(x)) for x in DataFrame.Frequency])
+            + '_' + pd.Series([str(int(x)) for x in DataFrame.Frequency], dtype=str)
 
         if (frequency_on == False) & (amplitude_on == True) & (train_duration_on == False):
             filter_tags = tags_init \
@@ -203,8 +203,8 @@ def Chunker(DataFrame, lead_on, channels_on, frequency_on, amplitude_on, train_d
 def ConfigOutputData(DataFrame):
     survey_cols = ['EventStart'] + list(DataFrame.columns.values[18:-1])
     ##Set aside surveys:
-    PreTrialSurveys = DataFrame.loc[DataFrame.TrialKey=='pre_trial_survey'].reset_index(drop=True).loc[:,survey_cols].rename(columns={'EventStart':'SurveyStart'}).add_prefix('Pre_')
-    PostTrialSurveys = DataFrame.loc[DataFrame.TrialKey=='post_trial_survey'].reset_index(drop=True).loc[:,survey_cols].rename(columns={'EventStart':'SurveyStart'}).add_prefix('Post_')
+    PreTrialSurveys = DataFrame.loc[DataFrame.TrialKey=='pre_trial_survey'].reset_index(drop=True).loc[:,survey_cols].rename(columns={'EventStart':'SurveyStart'}).add_prefix('PreTrial_')
+    PostTrialSurveys = DataFrame.loc[DataFrame.TrialKey=='post_trial_survey'].reset_index(drop=True).loc[:,survey_cols].rename(columns={'EventStart':'SurveyStart'}).add_prefix('PostTrial_')
     
     ##Set aside single-train trials:
     SingleTrainTrials = DataFrame.loc[DataFrame.TrialKey=='single_train_trial'].reset_index(drop=True).rename(columns={'EventDate':'TrialDate', 'EventStart':'TrialStart', 'EventStop':'TrialStop'})
@@ -319,8 +319,8 @@ def LoadNKData(patient_id, FileFormat):
 def AddBoxDisconnects(Subject, DataFrame, pre_trial_nostim_duration, post_trial_nostim_duration):
     nk_df = LoadNKData(Subject, 'csv')
     
-    window_start = [x - timedelta(seconds=pre_trial_nostim_duration) for x in list(DataFrame.EventStart)]
-    window_stop = [x + timedelta(seconds=post_trial_nostim_duration) for x in list(DataFrame.EventStop)]
+    window_start = [x - timedelta(seconds=pre_trial_nostim_duration) for x in list(DataFrame.TrialStart)]
+    window_stop = [x + timedelta(seconds=post_trial_nostim_duration) for x in list(DataFrame.TrialStop)]
 
     disconnects = list(nk_df.loc[nk_df['EventType'].str.contains('Mini junction box disconnected')].EventTimestamp)
     reconnects = list(nk_df.loc[nk_df['EventType'].str.contains('Mini junction box connected')].EventTimestamp)
