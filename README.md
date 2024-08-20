@@ -1,7 +1,7 @@
 # python-stage1-stimtab
 Tool that allows tabulation of stage 1 stimulation efficacy data based on user-specified criteria.
 
-Version: v2.0
+Version: v3.0
 
 Requirements: python>=3.8, pandas.
 
@@ -33,11 +33,11 @@ Custom functions called in "filter.py":
 
 `AssignTags`: Reads through input dataframe and tags each train of stimulation according to `lead_on` OR `channels_on`. It will include `frequency_on`, `amplitude_on` and `train_duration_on` if these are set to True. These tags will be used by the next function to initially chunk trains as part of a discrete trial. 
 
-`RunFilter1`: 
-
-`RunFilter2`:   
-
+`Chunker`: 
+   
 `ConfigOutputData`: Creates output CSV file with trials/blocks that meet user-specified criteria of `total_stim_duration`, `pre_trial_nostim_duration` and `post_trial_nostim_duration`. After selecting qualifying trials/blocks, it will add the closest survey before each trial/block starts and the closest survey after each trial/block ends.  
+
+`ConditionalOutput`:
 
 `LoadNKData`: Load NK annotations in dataframe based on `patient_id` (it considers differences in folder naming).
 
@@ -71,7 +71,7 @@ Each row represents a trial/block of stimulation that qualified the filter crite
 * `TotalStimDelivered`: Total duration in seconds of stimulation delivered in a trial (sum of `TrainDurationRange`).
 * `PreTrial_NoStim_Duration`: Indicates how many seconds of NO stim were recorded before a trial started.
 * `PostTrial_NoStim_Duration`: Indicates how many seconds of NO stim were recorded after a trial ended.
-* `TrialType`: If `single_train_trial`, trial has 1 train of stimulation, if `multi_train_trial`, trial has >1 train of stimulation.
+* `TrialKey`: If `single_train_trial`, trial has 1 train of stimulation, if `multi_train_trial`, trial has >1 train of stimulation.
 * `JunctionBoxDisconnects`: If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are not 0, it will indicate any disconnection of the mini junction box that happened between `TrialStart`-`pre_trial_nostim_duration` and `TrialStop`+`post_trial_nostim_duration`. If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are 0, by default it will indicate any disconnection that happened between 2 min before and 2 min after the trial.
 * `JunctionBoxReconnects`: If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are not 0, it will indicate any reconnection of the mini junction box that happened between `TrialStart`-`pre_trial_nostim_duration` and `TrialStop`+`post_trial_nostim_duration`. If `pre_trial_nostim_duration` and `post_trial_nostim_duration` are 0, by default it will indicate any reconnection that happened between 2 min before and 2 min after the trial.
 
