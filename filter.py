@@ -1,6 +1,6 @@
 """ filter.py
 tool to create table with discrete stim trials/block metadata. output in csv format.
-version v2.0
+version v3.0
 
 """
 
@@ -12,11 +12,11 @@ import re
 import pathlib 
 
 # Import custom functions #
-from tools import LoadRawData, ConfigInputData, AssignTags, RunFilter1, RunFilter2, ConfigOutputData, LoadNKData, AddBoxDisconnects
+from tools import LoadRawData, ConfigInputData, Chunker, ConfigOutputData, ConditionalOutput, LoadNKData, AddBoxDisconnects
 
 # User-specified inputs #
 OUTPUT_DIR = '/userdata/dastudillo/patient_data/stage1'
-patient_id = 'PR06'
+patient_id = 'PR05'
 
 ## MUTUALLY EXCLUSIVE: choose one as True
 lead_on = False
@@ -36,37 +36,25 @@ post_trial_nostim_duration = 0 #seconds
 # Start of actual CODE # 
 raw_df = LoadRawData(patient_id)
 input_df = ConfigInputData(raw_df)
-tagged_df = AssignTags(input_df, lead_on, channels_on, frequency_on, amplitude_on, train_duration_on)
-filter1_df = RunFilter1(tagged_df)
-filter2_df = RunFilter2(filter1_df, 120) #log10(100) = 2.0 (threshold chosen upon looking the log distribution of inter-stim durations)
-pre_output_df = ConfigOutputData(patient_id, filter2_df, total_stim_duration, pre_trial_nostim_duration, post_trial_nostim_duration)
+chunked_df = Chunker(input_df, lead_on, channels_on, frequency_on, amplitude_on, train_duration_on)
+curated_df = ConfigOutputData(chunked_df)
 
-## Add disconnects and reconnects in mini junction box
-if (pre_trial_nostim_duration != 0) & (post_trial_nostim_duration != 0):
-    output_df = AddBoxDisconnects(patient_id, pre_output_df, pre_trial_nostim_duration, post_trial_nostim_duration)
-if (pre_trial_nostim_duration == 0) & (post_trial_nostim_duration == 0):
-    output_df = AddBoxDisconnects(patient_id, pre_output_df, 120, 120)
+if (total_stim_duration!=0) & (pre_trial_nostim_duration!=0) & (post_trial_nostim_duration!=0):
+    conditional_df = ConditionalOutput(curated_df, total_stim_duration, pre_trial_nostim_duration, post_trial_nostim_duration)
+    output_df = AddBoxDisconnects(patient_id, conditional_df, pre_trial_nostim_duration, post_trial_nostim_duration)
 
-save_df = output_df.drop(columns=['PrevStimStop', 'NextStimStart']).rename(columns={'EventDate':'TrialDate',
-                                                                                    'EventStart':'TrialStart',
-                                                                                    'EventStop':'TrialStop',
-                                                                                    'DiffPrevStim':'PreTrial_NoStim_Duration',
-                                                                                    'DiffNextStim':'PostTrial_NoStim_Duration',
-                                                                                    'PreSurveyStart':'PreTrial_SurveyStart',
-                                                                                    'PostSurveyStart':'PostTrial_SurveyStart'})
+if (total_stim_duration==0) & (pre_trial_nostim_duration==0) & (post_trial_nostim_duration==0):
+    output_df = curated_df.copy()
 
 del raw_df
 del input_df
-del tagged_df
-del filter1_df
-del filter2_df
-del pre_output_df
-del output_df
+del chunked_df
+del curated_df
 
 now = datetime.datetime.now()
 creation_timestamp = now.strftime('%m%d%Y_%H%M%S')
 outfile_name = f'{patient_id}_Stage1_FilteredEfficacyTrials_{creation_timestamp}.csv'
-save_df.to_csv(pathlib.Path(OUTPUT_DIR, outfile_name), index=False)
+output_df.to_csv(pathlib.Path(OUTPUT_DIR, outfile_name), index=False)
 
 
 """End of code

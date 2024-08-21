@@ -1,6 +1,6 @@
 """ tools.py
 custom functions applied in filter.py
-version v2.0
+version v3.0
 DO NOT MODIFY
 
 """
@@ -31,41 +31,59 @@ def LoadRawData(patient_id):
 
 def ConfigInputData(DataFrame):
     ##Format timestamps
-    DataFrame['EventStart'] = pd.to_datetime(DataFrame.EventStart, format='%Y-%m-%d %H:%M:%S.%f')
-    DataFrame['EventStop'] = pd.to_datetime(DataFrame.EventStop, format='%Y-%m-%d %H:%M:%S.%f')
-
+    NewDataFrame = DataFrame.copy()
+    NewDataFrame['EventStart'] = pd.to_datetime(DataFrame.EventStart, format='%Y-%m-%d %H:%M:%S.%f')
+    NewDataFrame['EventStop'] = pd.to_datetime(DataFrame.EventStop, format='%Y-%m-%d %H:%M:%S.%f')
     ##Add date column
-    DataFrame.insert(0, 'EventDate', DataFrame['EventStart'].dt.date)
+    NewDataFrame.insert(0, 'EventDate', NewDataFrame['EventStart'].dt.date)
 
-    NewDataFrame = DataFrame.loc[DataFrame.EventType=='Stim'].reset_index(drop=True)
-    NewDataFrame = NewDataFrame.drop(columns=DataFrame.columns.values[12:])
+    StimDataFrame = NewDataFrame.loc[NewDataFrame.EventType=='Stim'].reset_index(drop=True)
+    SurveysDataFrame = NewDataFrame.loc[NewDataFrame.EventType=='Survey'].reset_index(drop=True)
 
-    lead_list = [re.split('(\d+)',x)[0] for x in NewDataFrame.PosContact]
-    NewDataFrame.insert(6, 'Lead', lead_list)
+    del NewDataFrame
+    
+    lead_list = [re.split('(\d+)',x)[0] for x in StimDataFrame.PosContact]
+    StimDataFrame['Lead'] = lead_list
 
-    pos_n = [re.split('(\d+)',x)[1] for x in NewDataFrame.PosContact]
-    neg_n = [re.split('(\d+)',x)[1] for x in NewDataFrame.NegContact]
-    channel_list = NewDataFrame.Lead + pos_n + '-' + neg_n
-    NewDataFrame.insert(7, 'Channels', channel_list)
+    pos_contacts = [re.split('(\d+)',x)[1] for x in StimDataFrame.PosContact]
+    neg_contacts = [re.split('(\d+)',x)[1] for x in StimDataFrame.NegContact]
+    channel_list = StimDataFrame.Lead + pos_contacts + '-' + neg_contacts
+    StimDataFrame['Channels'] = channel_list
 
     ##Add timestamps of preceding and next stim for each row
-    NewDataFrame['PrevStimStop'] = pd.Series(dtype='object') #time of preceding stim
-    NewDataFrame['NextStimStart'] = pd.Series(dtype='object') #time of next stim
-    NewDataFrame.loc[1:, 'PrevStimStop'] = list(NewDataFrame.EventStop[:-1])
-    NewDataFrame.loc[0:len(NewDataFrame)-2, 'NextStimStart'] = list(NewDataFrame.EventStart[1:])
-
+    StimDataFrame['PrevStimStop'] = pd.Series(dtype='object') #time of preceding stim
+    StimDataFrame['NextStimStart'] = pd.Series(dtype='object') #time of next stim
+    StimDataFrame.loc[1:, 'PrevStimStop'] = list(StimDataFrame.EventStop[:-1])
+    StimDataFrame.loc[0:len(StimDataFrame)-2, 'NextStimStart'] = list(StimDataFrame.EventStart[1:])
     ##Fixing format of recently added timestamps
-    NewDataFrame['PrevStimStop'] = pd.to_datetime(NewDataFrame['PrevStimStop'])
-    NewDataFrame['NextStimStart'] = pd.to_datetime(NewDataFrame['NextStimStart'])
-
+    StimDataFrame['PrevStimStop'] = pd.to_datetime(StimDataFrame['PrevStimStop'])
+    StimDataFrame['NextStimStart'] = pd.to_datetime(StimDataFrame['NextStimStart'])
     ##Calculate difference between start of current stim and stop of previous stim, this will be pre-stim time
-    NewDataFrame['DiffPrevStim'] = [x.total_seconds() for x in NewDataFrame.EventStart - NewDataFrame.PrevStimStop]
+    StimDataFrame['PreTrial_NoStim_Duration'] = [x.total_seconds() for x in StimDataFrame.EventStart - StimDataFrame.PrevStimStop]
     ##Calculate difference between stop of current stim and start of next stim, this will be post-stim time
-    NewDataFrame['DiffNextStim'] = [x.total_seconds() for x in NewDataFrame.NextStimStart - NewDataFrame.EventStop]
+    StimDataFrame['PostTrial_NoStim_Duration'] = [x.total_seconds() for x in StimDataFrame.NextStimStart - StimDataFrame.EventStop]
+
+    NewDataFrame = pd.concat([StimDataFrame, SurveysDataFrame], ignore_index=True).sort_values(by='EventStart').reset_index(drop=True)
+    col6 = NewDataFrame.pop('Lead')
+    col7 = NewDataFrame.pop('Channels')
+    col14 = NewDataFrame.pop('PrevStimStop')
+    col15 = NewDataFrame.pop('NextStimStart')
+    col16 = NewDataFrame.pop('PreTrial_NoStim_Duration')
+    col17 = NewDataFrame.pop('PostTrial_NoStim_Duration')
+
+    NewDataFrame.insert(6, 'Lead', col6)
+    NewDataFrame.insert(7, 'Channels', col7)
+    NewDataFrame.insert(14, 'PrevStimStop', col14)
+    NewDataFrame.insert(15, 'NextStimStart', col15)
+    NewDataFrame.insert(16, 'PreTrial_NoStim_Duration', col16)
+    NewDataFrame.insert(17, 'PostTrial_NoStim_Duration', col17)
+
+    del StimDataFrame
+    del SurveysDataFrame
 
     return NewDataFrame
 
-#GENERATE DISCRETE TRIALS: Assign filter tags
+#ASSIGN TEMPORARY TAGS TO IDENTIFY PERIODS OF STIMULATION USING SAME PARAMETERS
 def AssignTags(DataFrame, lead_on, channels_on, frequency_on, amplitude_on, train_duration_on):
     if (lead_on == False) & (channels_on == False):
         filter_on = False
@@ -88,7 +106,7 @@ def AssignTags(DataFrame, lead_on, channels_on, frequency_on, amplitude_on, trai
 
         if (frequency_on == True) & (amplitude_on == False) & (train_duration_on == False):
             filter_tags = tags_init \
-            + '_' + pd.Series([str(int(x)) for x in DataFrame.Frequency])
+            + '_' + pd.Series([str(int(x)) for x in DataFrame.Frequency], dtype=str)
 
         if (frequency_on == False) & (amplitude_on == True) & (train_duration_on == False):
             filter_tags = tags_init \
@@ -126,97 +144,70 @@ def AssignTags(DataFrame, lead_on, channels_on, frequency_on, amplitude_on, trai
             if 'Active' in stim_condition[i]:
                 filter_tags_clean.append(filter_tags[i])
 
-        DataFrame['FilterTags'] = filter_tags_clean
-
-    return DataFrame
-
-def RunFilter1(DataFrame):
-    NewDataFrame = pd.DataFrame()
-    DataFrameEfficacy = DataFrame.loc[DataFrame['EventCondition'].isnull()].reset_index(drop=True)
-    unique_dates = list(DataFrameEfficacy.EventDate.unique())
-
-    for i in range(len(unique_dates)):
-        DayDataFrame = DataFrameEfficacy.loc[DataFrameEfficacy.EventDate==unique_dates[i]].reset_index(drop=True)
-        ##Initialize list
-        if DayDataFrame['FilterTags'][0] != DayDataFrame['FilterTags'][1]:
-            break_list1 = ['single_train_trial']
-
-        if (DayDataFrame['FilterTags'][0] == DayDataFrame['FilterTags'][1]):
-            break_list1 = ['multi_train_trial_start']
-
-        for i in range(1, len(DayDataFrame['FilterTags'])-1):
-            
-            if (DayDataFrame['FilterTags'][i] == DayDataFrame['FilterTags'][i-1]) \
-            & (DayDataFrame['FilterTags'][i] == DayDataFrame['FilterTags'][i+1]):
-                break_list1.append('multi_train_trial_continue')
-
-            if (DayDataFrame['FilterTags'][i] == DayDataFrame['FilterTags'][i-1]) \
-            & (DayDataFrame['FilterTags'][i] != DayDataFrame['FilterTags'][i+1]):
-                break_list1.append('multi_train_trial_stop')
-
-            if (DayDataFrame['FilterTags'][i] != DayDataFrame['FilterTags'][i-1]) \
-            & (DayDataFrame['FilterTags'][i] == DayDataFrame['FilterTags'][i+1]):
-                break_list1.append('multi_train_trial_start')
-
-            if (DayDataFrame['FilterTags'][i] != DayDataFrame['FilterTags'][i-1]) \
-            & (DayDataFrame['FilterTags'][i] != DayDataFrame['FilterTags'][i+1]):
-                break_list1.append('single_train_trial')
-
-        ##Add last values of list
-        if DayDataFrame['FilterTags'][len(DayDataFrame)-1] != DayDataFrame['FilterTags'][len(DayDataFrame)-2]:
-            break_list1.append('single_train_trial')
-
-        if DayDataFrame['FilterTags'][len(DayDataFrame)-1] == DayDataFrame['FilterTags'][len(DayDataFrame)-2]:
-            break_list1.append('multi_train_trial_stop')
-
-        #Add column of tags
-        DayDataFrame['BreakKey1'] = break_list1
-
-        NewDataFrame = pd.concat([NewDataFrame, DayDataFrame], ignore_index=True)
+        NewDataFrame = DataFrame.copy()
+        NewDataFrame['FilterTags'] = filter_tags_clean
 
     return NewDataFrame
 
-def RunFilter2(DataFrame, time_threshold):
-    break_list2 = list(DataFrame.BreakKey1)
+##Chunk data using survey collection as bounderies
+def Chunker(DataFrame, lead_on, channels_on, frequency_on, amplitude_on, train_duration_on):
+    surveys_grouped = DataFrame.groupby(DataFrame.EventType)
+    surveys_idx = list(surveys_grouped.get_group('Survey').index.values)
 
-    for i in range(len(DataFrame.FilterTags)):
-        if (DataFrame['DiffPrevStim'][i]>time_threshold) & (DataFrame['DiffNextStim'][i]>time_threshold):
-            break_list2[i] = 'single_train_trial'
+    ChunkedDataFrame = pd.DataFrame()
 
-        if (i>0) & (i<len(DataFrame.FilterTags)-1):
-            if (DataFrame['FilterTags'][i] == DataFrame['FilterTags'][i-1]) \
-            & (DataFrame['FilterTags'][i] == DataFrame['FilterTags'][i+1]) \
-            & (DataFrame['DiffPrevStim'][i]>time_threshold) \
-            & (DataFrame['DiffNextStim'][i]<=time_threshold):
-                break_list2[i] = 'multi_train_trial_start'
+    for i in range(len(surveys_idx)-2):
+        TagDataFrame = DataFrame.iloc[surveys_idx[i]:surveys_idx[i+1]+1,:].reset_index(drop=True)
+        tags_n = len(list(AssignTags(TagDataFrame.loc[TagDataFrame.EventType=='Stim'].reset_index(drop=True),lead_on, channels_on, frequency_on, amplitude_on, train_duration_on).FilterTags.unique()))
 
-            if (DataFrame['FilterTags'][i] == DataFrame['FilterTags'][i-1]) \
-            & (DataFrame['FilterTags'][i] == DataFrame['FilterTags'][i+1]) \
-            & (DataFrame['DiffPrevStim'][i]<=time_threshold) \
-            & (DataFrame['DiffNextStim'][i]>time_threshold):
-                break_list2[i] = 'multi_train_trial_stop'
+        if tags_n == 1:
+            TagDataFrame['TrialType'] = 'single_channel_trial'
+        if tags_n > 1:
+            TagDataFrame['TrialType'] = 'multi_channel_trial'
+        if tags_n == 0:
+            TagDataFrame['TrialType'] = 'no_stim_applied'
 
-            if (DataFrame['FilterTags'][i] == DataFrame['FilterTags'][i-1]) \
-            & (DataFrame['FilterTags'][i] != DataFrame['FilterTags'][i+1]) \
-            & (DataFrame['DiffPrevStim'][i]>time_threshold):
-                break_list2[i] = 'single_train_trial'
+        ChunkedDataFrame = pd.concat([ChunkedDataFrame, TagDataFrame], ignore_index=True)
 
-            if (DataFrame['FilterTags'][i] != DataFrame['FilterTags'][i-1]) \
-            & (DataFrame['FilterTags'][i] == DataFrame['FilterTags'][i+1]) \
-            & (DataFrame['DiffNextStim'][i]>time_threshold):
-                break_list2[i] = 'single_train_trial'
+    ChunkedDataFrameClean = ChunkedDataFrame.loc[ChunkedDataFrame.TrialType=='single_channel_trial'].reset_index(drop=True)
+    data_grouped = ChunkedDataFrameClean.groupby(ChunkedDataFrameClean.EventType)
+    pre_trial_surveys = list(data_grouped.get_group('Survey').index.values)[0::2]
+    post_trial_surveys = list(data_grouped.get_group('Survey').index.values)[1::2]
+    PreTrialSurveys = ChunkedDataFrameClean.iloc[pre_trial_surveys, :].reset_index(drop=True)
+    PreTrialSurveys['TrialKey'] = 'pre_trial_survey'
+    PostTrialSurveys = ChunkedDataFrameClean.iloc[post_trial_surveys, :].reset_index(drop=True)
+    PostTrialSurveys['TrialKey'] = 'post_trial_survey'
+    StimTrials = pd.DataFrame()
 
-    NewDataFrame = DataFrame.copy()
-    NewDataFrame['BreakKey2'] = break_list2
+    for i in range(len(pre_trial_surveys)):
+        DiscreteStimTrial = ChunkedDataFrameClean.iloc[pre_trial_surveys[i]+1:post_trial_surveys[i]].reset_index(drop=True)
+        trial_key = []
+        for index in DiscreteStimTrial.index.values:
+            if len(DiscreteStimTrial)==1:
+                trial_key.append('single_train_trial')
+            if (len(DiscreteStimTrial)>1) & (index==0):
+                trial_key.append('multi_train_trial_start')
+            if (len(DiscreteStimTrial)>1) & (index!=0) & (index!=len(DiscreteStimTrial)-1):
+                trial_key.append('multi_train_trial_continue')
+            if (len(DiscreteStimTrial)>1) & (index!=0) & (index==len(DiscreteStimTrial)-1):
+                trial_key.append('multi_train_trial_stop')
+        DiscreteStimTrial['TrialKey'] = trial_key
+
+        StimTrials = pd.concat([StimTrials, DiscreteStimTrial], ignore_index=True)
+
+    NewDataFrame = pd.concat([PreTrialSurveys, PostTrialSurveys, StimTrials], ignore_index=True).sort_values(by='EventStart').reset_index(drop=True).drop(columns='TrialType')
 
     return NewDataFrame
 
-#Final csv, filter trials based on user-specified filters if any, adds pre-stim and post-stim survey info.
-def ConfigOutputData(patient_id, DataFrame, total_stim_duration, pre_trial_nostim_duration, post_trial_nostim_duration):
-
+##CONFIGURE OUTPUT DATA WITHOUT ADDING RESTRICTIONS
+def ConfigOutputData(DataFrame):
+    survey_cols = ['EventStart'] + list(DataFrame.columns.values[18:-1])
+    ##Set aside surveys:
+    PreTrialSurveys = DataFrame.loc[DataFrame.TrialKey=='pre_trial_survey'].reset_index(drop=True).loc[:,survey_cols].rename(columns={'EventStart':'SurveyStart'}).add_prefix('PreTrial_')
+    PostTrialSurveys = DataFrame.loc[DataFrame.TrialKey=='post_trial_survey'].reset_index(drop=True).loc[:,survey_cols].rename(columns={'EventStart':'SurveyStart'}).add_prefix('PostTrial_')
+    
     ##Set aside single-train trials:
-    SingleTrainTrials = DataFrame.loc[DataFrame.BreakKey2=='single_train_trial'].reset_index(drop=True).drop(columns=['FilterTags', 'BreakKey1', 'BreakKey2'])
-    SingleTrainTrials['TrialType'] = 'single_train_trial'
+    SingleTrainTrials = DataFrame.loc[DataFrame.TrialKey=='single_train_trial'].reset_index(drop=True).rename(columns={'EventDate':'TrialDate', 'EventStart':'TrialStart', 'EventStop':'TrialStop'})
     SingleTrainTrials['AmplitudeRange'] = SingleTrainTrials.Amplitude
     SingleTrainTrials['AmplitudeMean'] = SingleTrainTrials.Amplitude
     SingleTrainTrials['TrainDurationRange'] = SingleTrainTrials.TrainDuration
@@ -224,115 +215,77 @@ def ConfigOutputData(patient_id, DataFrame, total_stim_duration, pre_trial_nosti
     SingleTrainTrials['TrainNumber'] = 1
     SingleTrainTrials['TotalStimDelivered'] = SingleTrainTrials.TrainDuration
     
-    ##Code that actually creates table with discrete trials.
-    subset_grouped = DataFrame.groupby(DataFrame.BreakKey2)
-    trial_start_idx = list(subset_grouped.get_group('multi_train_trial_start').index.values)
-    trial_stop_idx = list(subset_grouped.get_group('multi_train_trial_stop').index.values)
+    ##Handle multi-train trials.
+    trials_grouped = DataFrame.groupby(DataFrame.TrialKey)
+    trial_start_idx = list(trials_grouped.get_group('multi_train_trial_start').index.values)
+    trial_stop_idx = list(trials_grouped.get_group('multi_train_trial_stop').index.values)
 
     MultiTrainTrials = {}
 
     for i in range(len(trial_start_idx)):
-        df_init = DataFrame.iloc[trial_start_idx[i]:trial_stop_idx[i]+1]
-        MultiTrainTrials[i] = {'EventDate': df_init.EventDate[trial_start_idx[i]],
-                              'EventStart':df_init.EventStart[trial_start_idx[i]],
-                              'EventStop': df_init.EventStop[trial_stop_idx[i]],
+        MultiTrainTrial = DataFrame.iloc[trial_start_idx[i]:trial_stop_idx[i]+1]
+        MultiTrainTrials[i] = {'TrialDate': MultiTrainTrial.EventDate[trial_start_idx[i]],
+                              'TrialStart':MultiTrainTrial.EventStart[trial_start_idx[i]],
+                              'TrialStop': MultiTrainTrial.EventStop[trial_stop_idx[i]],
                               #'EventType': df_init.EventType[trial_start_idx[i]],
-                              #'EventCondition': df_init.EventCondition[trial_start_idx[i]],
-                              'StimCondition': df_init.StimCondition[trial_start_idx[i]],
-                              'Lead': df_init.Lead[trial_start_idx[i]],
-                              'Channels': df_init.Channels[trial_start_idx[i]],
-                              'PosContact': df_init.PosContact[trial_start_idx[i]],
-                              'NegContact': df_init.NegContact[trial_start_idx[i]],
-                              'AmplitudeRange': list(df_init.Amplitude),
-                              'AmplitudeMean': df_init.Amplitude.mean(),
-                              'PulseDuration': df_init.PulseDuration[trial_start_idx[i]],
-                              'TrainDurationRange': list(df_init.TrainDuration),
-                              'TrainDurationMean': df_init.TrainDuration.mean(),
-                              'TrainNumber': len(df_init),
-                              'Frequency': df_init.Frequency[trial_start_idx[i]],
-                              'TotalStimDelivered': df_init.TrainDuration.sum(),
-                              'PrevStimStop': df_init.PrevStimStop[trial_start_idx[i]],
-                              'NextStimStart': df_init.NextStimStart[trial_stop_idx[i]],
-                              'DiffPrevStim': df_init.DiffPrevStim[trial_start_idx[i]],
-                              'DiffNextStim': df_init.DiffNextStim[trial_stop_idx[i]],
-                              'TrialType': 'multi_train_trial'
+                              'EventCondition': MultiTrainTrial.EventCondition[trial_start_idx[i]],
+                              'StimCondition': MultiTrainTrial.StimCondition[trial_start_idx[i]],
+                              'Lead': MultiTrainTrial.Lead[trial_start_idx[i]],
+                              'Channels': MultiTrainTrial.Channels[trial_start_idx[i]],
+                              'PosContact': MultiTrainTrial.PosContact[trial_start_idx[i]],
+                              'NegContact': MultiTrainTrial.NegContact[trial_start_idx[i]],
+                              'AmplitudeRange': list(MultiTrainTrial.Amplitude),
+                              'AmplitudeMean': MultiTrainTrial.Amplitude.mean(),
+                              'PulseDuration': MultiTrainTrial.PulseDuration[trial_start_idx[i]],
+                              'TrainDurationRange': list(MultiTrainTrial.TrainDuration),
+                              'TrainDurationMean': MultiTrainTrial.TrainDuration.mean(),
+                              'TrainNumber': len(MultiTrainTrial),
+                              'Frequency': MultiTrainTrial.Frequency[trial_start_idx[i]],
+                              'TotalStimDelivered': MultiTrainTrial.TrainDuration.sum(),
+                              'PrevStimStop': MultiTrainTrial.PrevStimStop[trial_start_idx[i]],
+                              'NextStimStart': MultiTrainTrial.NextStimStart[trial_stop_idx[i]],
+                              'PreTrial_NoStim_Duration': MultiTrainTrial.PreTrial_NoStim_Duration[trial_start_idx[i]],
+                              'PostTrial_NoStim_Duration': MultiTrainTrial.PostTrial_NoStim_Duration[trial_stop_idx[i]],
+                              'TrialKey': 'multi_train_trial'
                              }
 
     MultiTrainTrials_Clean = pd.DataFrame(MultiTrainTrials).T
     SingleTrainTrials_Clean = SingleTrainTrials.loc[:, MultiTrainTrials_Clean.columns.values]
-    NewDataFrame_unsorted = pd.concat([MultiTrainTrials_Clean, SingleTrainTrials_Clean], ignore_index=True)
-    NewDataFrame = NewDataFrame_unsorted.sort_values(by='EventStart').reset_index(drop=True)
+    AllTrials = pd.concat([MultiTrainTrials_Clean, SingleTrainTrials_Clean], ignore_index=True).sort_values(by='TrialStart').reset_index(drop=True)
+    PreCuratedDataFrame = pd.concat([AllTrials, PreTrialSurveys, PostTrialSurveys], axis=1)
+    CuratedDataFrame = PreCuratedDataFrame.loc[PreCuratedDataFrame['EventCondition'].isnull()].reset_index(drop=True).drop(columns=['EventCondition', 'PrevStimStop', 'NextStimStart'])
+                                    
+    return CuratedDataFrame
 
-    if (total_stim_duration==0) & (pre_trial_nostim_duration==0) & (post_trial_nostim_duration==0):
-        FinalDataFrame = NewDataFrame.copy()
-
+##SELECT DATA BASED ON CONDITIONS OF TOTAL STIM DURATION, PRE-TRIAL NO STIM DURATION AND POST-TRIAL NO STIM DURATION.
+def ConditionalOutput(DataFrame, total_stim_duration, pre_trial_nostim_duration, post_trial_nostim_duration):
     if (total_stim_duration!=0) & (pre_trial_nostim_duration!=0) & (post_trial_nostim_duration!=0):
-        FinalDataFrame = NewDataFrame.loc[(NewDataFrame.TotalStimDelivered>=total_stim_duration) \
-                                          & (NewDataFrame.DiffPrevStim>=pre_trial_nostim_duration) \
-                                          & (NewDataFrame.DiffNextStim>=post_trial_nostim_duration)].reset_index(drop=True)
+        NewDataFrame = DataFrame.loc[(DataFrame.TotalStimDelivered>=total_stim_duration) \
+        & (DataFrame.PreTrial_NoStim_Duration>=pre_trial_nostim_duration) \
+        & (DataFrame.PostTrial_NoStim_Duration>=post_trial_nostim_duration)].reset_index(drop=True)
 
     if (total_stim_duration==0) & (pre_trial_nostim_duration!=0) & (post_trial_nostim_duration!=0):
-        FinalDataFrame = NewDataFrame.loc[(NewDataFrame.DiffPrevStim>=pre_trial_nostim_duration) \
-                                          & (NewDataFrame.DiffNextStim>=post_trial_nostim_duration)].reset_index(drop=True)
+        NewDataFrame = DataFrame.loc[(DataFrame.PreTrial_NoStim_Duration>=pre_trial_nostim_duration) \
+        & (DataFrame.PostTrial_NoStim_Duration>=post_trial_nostim_duration)].reset_index(drop=True)
 
     if (total_stim_duration!=0) & (pre_trial_nostim_duration==0) & (post_trial_nostim_duration!=0):
-        FinalDataFrame = NewDataFrame.loc[(NewDataFrame.TotalStimDelivered>=total_stim_duration) \
-                                          & (NewDataFrame.DiffNextStim>=post_trial_nostim_duration)].reset_index(drop=True)
+        NewDataFrame = DataFrame.loc[(DataFrame.TotalStimDelivered>=total_stim_duration) \
+        & (DataFrame.PostTrial_NoStim_Duration>=post_trial_nostim_duration)].reset_index(drop=True)
 
     if (total_stim_duration!=0) & (pre_trial_nostim_duration!=0) & (post_trial_nostim_duration==0):
-        FinalDataFrame = NewDataFrame.loc[(NewDataFrame.TotalStimDelivered>=total_stim_duration) \
-                                          & (NewDataFrame.DiffPrevStim>=pre_trial_nostim_duration)].reset_index(drop=True)
+        NewDataFrame = DataFrame.loc[(DataFrame.TotalStimDelivered>=total_stim_duration) \
+        & (DataFrame.PreTrial_NoStim_Duration>=pre_trial_nostim_duration)].reset_index(drop=True)
 
     if (total_stim_duration!=0) & (pre_trial_nostim_duration==0) & (post_trial_nostim_duration==0):
-        FinalDataFrame = NewDataFrame.loc[NewDataFrame.TotalStimDelivered>=total_stim_duration].reset_index(drop=True)
+        NewDataFrame = DataFrame.loc[DataFrame.TotalStimDelivered>=total_stim_duration].reset_index(drop=True)
 
     if (total_stim_duration==0) & (pre_trial_nostim_duration!=0) & (post_trial_nostim_duration==0):
-        FinalDataFrame = NewDataFrame.loc[NewDataFrame.DiffPrevStim>=pre_trial_nostim_duration].reset_index(drop=True)
+        NewDataFrame = DataFrame.loc[DataFrame.PreTrial_NoStim_Duration>=pre_trial_nostim_duration].reset_index(drop=True)
 
     if (total_stim_duration==0) & (pre_trial_nostim_duration==0) & (post_trial_nostim_duration!=0):
-        FinalDataFrame = NewDataFrame.loc[NewDataFrame.DiffNextStim>=post_trial_nostim_duration].reset_index(drop=True)
+        NewDataFrame = DataFrame.loc[DataFrame.PostTrial_NoStim_Duration>=post_trial_nostim_duration].reset_index(drop=True)
 
-    ##Assign survey timestamps pre and post stim trials/block
-    ##Code chooses the closest survey collected before the start of the trial and after the trial has stopped.
-    master_survey = LoadRawData(patient_id).loc[LoadRawData(patient_id).EventType=='Survey'].reset_index(drop=True)
-    master_survey['EventStart'] = pd.to_datetime(master_survey.EventStart)
-    trial_start = FinalDataFrame.EventStart
-    trial_stop = FinalDataFrame.EventStop
-    survey_times = master_survey.EventStart
-
-    pre_stim_survey = []
-    post_stim_survey = []
-
-    for i in range(len(trial_start)):
-        pre_stim_survey.append(min([x for x in survey_times if x<trial_start[i]], key=lambda x: abs(x - trial_start[i])))
-        post_stim_survey.append(min([x for x in survey_times if x>trial_stop[i]], key=lambda x: abs(x - trial_stop[i])))
-
-    FinalDataFrame['PreSurveyStart'] = pre_stim_survey
-    FinalDataFrame['PostSurveyStart'] = post_stim_survey
-
-    ##Add survey scores based on timestamps
-    pre_survey_df_init = pd.DataFrame(FinalDataFrame.PreSurveyStart).merge(master_survey,
-                                                                           how = 'left',
-                                                                           left_on = 'PreSurveyStart',
-                                                                           right_on = 'EventStart')
-
-    post_survey_df_init = pd.DataFrame(FinalDataFrame.PostSurveyStart).merge(master_survey,
-                                                                             how = 'left',
-                                                                             left_on = 'PostSurveyStart',
-                                                                             right_on = 'EventStart')
-
-    unused_cols = ['EventStart', 'EventStop', 'EventType', 'EventCondition', 'StimCondition', 'PosContact',
-                   'NegContact', 'Amplitude', 'PulseDuration', 'TrainDuration', 'Frequency']
-
-    pre_survey_df = pre_survey_df_init.drop(columns=unused_cols)
-    post_survey_df = post_survey_df_init.drop(columns=unused_cols)
-
-    CuratedDataFrame = pd.concat([FinalDataFrame,
-                                  pre_survey_df.iloc[:, 1:].add_prefix('PreTrial_'),
-                                  post_survey_df.iloc[:, 1:].add_prefix('PostTrial_')],
-                                 axis=1)
-
-    return CuratedDataFrame
+    return NewDataFrame
 
 ##custom function to load NK annotations in a clean dataframe
 def LoadNKData(patient_id, FileFormat):
@@ -366,8 +319,8 @@ def LoadNKData(patient_id, FileFormat):
 def AddBoxDisconnects(Subject, DataFrame, pre_trial_nostim_duration, post_trial_nostim_duration):
     nk_df = LoadNKData(Subject, 'csv')
     
-    window_start = [x - timedelta(seconds=pre_trial_nostim_duration) for x in list(DataFrame.EventStart)]
-    window_stop = [x + timedelta(seconds=post_trial_nostim_duration) for x in list(DataFrame.EventStop)]
+    window_start = [x - timedelta(seconds=pre_trial_nostim_duration) for x in list(DataFrame.TrialStart)]
+    window_stop = [x + timedelta(seconds=post_trial_nostim_duration) for x in list(DataFrame.TrialStop)]
 
     disconnects = list(nk_df.loc[nk_df['EventType'].str.contains('Mini junction box disconnected')].EventTimestamp)
     reconnects = list(nk_df.loc[nk_df['EventType'].str.contains('Mini junction box connected')].EventTimestamp)
