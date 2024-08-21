@@ -8,20 +8,21 @@ Requirements: python>=3.8, pandas.
 ## Overview:
 Code works using 2 python files: `tools.py` and `filter.py`. Custom functions in `tools.py` will be imported and applied in `filter.py`. Be sure to open `filter.py` on an editing tool and modify the values of the user-specified inputs according to your preferences. Save your changes and on the same command line run `python filter.py`. 
 
-Code reads through each row of a source dataframe and identifies the start and stop of a trial/block of stimulation based on the user-specified criteria. It then curates a new dataframe with trial metadata using identifiers previously assigned by the filter.    
+In this version, discrete periods of stimulation, referred as trials from now on, are first identified using survey timestamps as bounderies. Trials where we applied stimulation using the same parameters (by default: same contacts + frequency) continue down the pipeline. Then, information from each trial is collapsed into a row that will become part of a new output table, including survey scores pre- and post-trial. As an option, you can specify 1) a minimum of total stimulation duration applied in a trial, 2) a minimum of seconds of no stimulation before a trial, and 3) a minimum of seconds of no stimulation after a trial in order to output a table that contains trials that meet the requirements.      
 
 ## User-specified variables/inputs:
+Located in `filter.py`
 
 * `OUTPUT_DIR`: string, path to directory in server where output CSV will be saved.
 * `patient_id`: string, identifier of subject in presidio study (e.g. 'PR05', it won't accept 'pr05').
-* `lead_on`: boolean, if set to True, trials/blocks will be identified by trains of stimulation delivered in the same lead, regardless of contact number. Mutually exclusive with variable `channels_on`.
-* `channels_on`: boolean, if set to True, trials/blocks will be identified by trains of stimulations delivered in the same pair of contacts. For example, after 8 trains of stimulation in LVC2-3 the filter detects that the next train of stimulation is in LVC3-4. Then the filter will assign the last train in LVC2-3 as the end of an LVC2-3 trial, and the first train of LVC3-4 as the start of a new trial. Mutually exclusive with `lead_on`.
-* `frequency_on`: boolean, if set to True, frequency of stimulation will be considered as a criteria for trials/blocks identification. Optional and can be used in addition to other booleans. 
-* `amplitude_on`: boolean, if set to True, amplitude of stimulation will be considered as criteria for trials/blocks identification. Optional and can be used in addition to other booleans.
-* `train_duration_on`: boolean, if set to True, train duration (e.g. 10s, 20s, 120s) will be considered as criteria for trials/blocks identification. Optional and can be used in addition to other booleans.
-* `total_stim_duration`: int or float, indicates minimum total time in seconds of stimulation delivered within a trial/block. This is applied AFTER trials/blocks have been identified and labeled. Optional and can be used if you only want to output trials/blocks in which we delivered X seconds or more of total stimulation, otherwise set to 0.
-* `pre_trial_nostim_duration`: int or float, indicates minimum time in seconds of NO stimulation before delivering the first train in a trial/block. This is applied AFTER trials/blocks have been identified and labeled. Optional and can be used if you only want to output trials/blocks that have X seconds or more of no stimulation before the trial started, otherwise set to 0.  
-* `post_trial_nostim_duration`: int or float, indicates minimum time in seconds of NO stimulation after delivering the last train in a trial/block. This is applied AFTER trials/blocks have been identified and labeled. Optional and can be used if you only want to output trials/blocks that have X seconds or more of no stimulation after the trial ended, otherwise set to 0.
+* `lead_on`: boolean, if set to True, trials will be accepted as long as stimulation was delivered in the same lead, regardless of contact number. Mutually exclusive with variable `channels_on`.
+* `channels_on`: boolean, if set to True, trials will be accepted as long as stimulation was delivered in the same pair of contacts. Mutually exclusive with `lead_on`.
+* `frequency_on`: boolean, if set to True, frequency of stimulation will be considered as a criteria for trial eligibility. Optional and can be used in addition to other booleans. 
+* `amplitude_on`: boolean, if set to True, amplitude of stimulation will be considered as criteria for trial eligibility. Optional and can be used in addition to other booleans.
+* `train_duration_on`: boolean, if set to True, train duration (e.g. 10s, 20s, 120s) will be considered as criteria for trial eligibility. Optional and can be used in addition to other booleans.
+* `total_stim_duration`: int or float, indicates minimum total time in seconds of stimulation delivered in a trial. This is applied AFTER trials have been identified by survey bounderies. Optional and can be used if you only want to output trials in which we delivered X seconds or more of total stimulation, otherwise set to 0.
+* `pre_trial_nostim_duration`: int or float, indicates minimum time in seconds of NO stimulation before delivering the first train in a trial. This is applied AFTER trials have been identified by survey bounderies. Optional and can be used if you only want to output trials that have X seconds or more of no stimulation before the trial started, otherwise set to 0.  
+* `post_trial_nostim_duration`: int or float, indicates minimum time in seconds of NO stimulation after delivering the last train in a trial. This is applied AFTER trials have been identified by survey bounderies. Optional and can be used if you only want to output trials that have X seconds or more of no stimulation after the trial ended, otherwise set to 0.
 
      
 ## tools.py
