@@ -8,20 +8,21 @@ Requirements: python>=3.8, pandas.
 ## Overview:
 Code works using 2 python files: `tools.py` and `filter.py`. Custom functions in `tools.py` will be imported and applied in `filter.py`. Be sure to open `filter.py` on an editing tool and modify the values of the user-specified inputs according to your preferences. Save your changes and on the same command line run `python filter.py`. 
 
-Code reads through each row of a source dataframe and identifies the start and stop of a trial/block of stimulation based on the user-specified criteria. It then curates a new dataframe with trial metadata using identifiers previously assigned by the filter.    
+In this version, discrete periods of stimulation, referred as trials from now on, are first identified using survey timestamps as bounderies. Trials where we applied stimulation using the same parameters (by default: same contacts + frequency) continue down the pipeline. Then, information from each trial is collapsed into a row that will become part of a new output table, including survey scores pre- and post-trial. After trials are curated in a new table, code will remove any trial that was part of ERPs, safety testing, induction or task. As an option, you can specify 1) a minimum of total stimulation duration applied in a trial, 2) a minimum of seconds of no stimulation before a trial, and 3) a minimum of seconds of no stimulation after a trial in order to output a table that contains trials that meet the requirements.      
 
 ## User-specified variables/inputs:
+Located in `filter.py`
 
 * `OUTPUT_DIR`: string, path to directory in server where output CSV will be saved.
 * `patient_id`: string, identifier of subject in presidio study (e.g. 'PR05', it won't accept 'pr05').
-* `lead_on`: boolean, if set to True, trials/blocks will be identified by trains of stimulation delivered in the same lead, regardless of contact number. Mutually exclusive with variable `channels_on`.
-* `channels_on`: boolean, if set to True, trials/blocks will be identified by trains of stimulations delivered in the same pair of contacts. For example, after 8 trains of stimulation in LVC2-3 the filter detects that the next train of stimulation is in LVC3-4. Then the filter will assign the last train in LVC2-3 as the end of an LVC2-3 trial, and the first train of LVC3-4 as the start of a new trial. Mutually exclusive with `lead_on`.
-* `frequency_on`: boolean, if set to True, frequency of stimulation will be considered as a criteria for trials/blocks identification. Optional and can be used in addition to other booleans. 
-* `amplitude_on`: boolean, if set to True, amplitude of stimulation will be considered as criteria for trials/blocks identification. Optional and can be used in addition to other booleans.
-* `train_duration_on`: boolean, if set to True, train duration (e.g. 10s, 20s, 120s) will be considered as criteria for trials/blocks identification. Optional and can be used in addition to other booleans.
-* `total_stim_duration`: int or float, indicates minimum total time in seconds of stimulation delivered within a trial/block. This is applied AFTER trials/blocks have been identified and labeled. Optional and can be used if you only want to output trials/blocks in which we delivered X seconds or more of total stimulation, otherwise set to 0.
-* `pre_trial_nostim_duration`: int or float, indicates minimum time in seconds of NO stimulation before delivering the first train in a trial/block. This is applied AFTER trials/blocks have been identified and labeled. Optional and can be used if you only want to output trials/blocks that have X seconds or more of no stimulation before the trial started, otherwise set to 0.  
-* `post_trial_nostim_duration`: int or float, indicates minimum time in seconds of NO stimulation after delivering the last train in a trial/block. This is applied AFTER trials/blocks have been identified and labeled. Optional and can be used if you only want to output trials/blocks that have X seconds or more of no stimulation after the trial ended, otherwise set to 0.
+* `lead_on`: boolean, if set to True, trials will be accepted as long as stimulation was delivered in the same lead, regardless of contact number. Mutually exclusive with variable `channels_on`.
+* `channels_on`: boolean, if set to True, trials will be accepted as long as stimulation was delivered in the same pair of contacts. Mutually exclusive with `lead_on`.
+* `frequency_on`: boolean, if set to True, frequency of stimulation will be considered as a criteria for trial eligibility. Optional and can be used in addition to other booleans. 
+* `amplitude_on`: boolean, if set to True, amplitude of stimulation will be considered as criteria for trial eligibility. Optional and can be used in addition to other booleans.
+* `train_duration_on`: boolean, if set to True, train duration (e.g. 10s, 20s, 120s) will be considered as criteria for trial eligibility. Optional and can be used in addition to other booleans.
+* `total_stim_duration`: int or float, indicates minimum total time in seconds of stimulation delivered in a trial. This is applied AFTER trials have been identified by survey bounderies. Optional and can be used if you only want to output trials in which we delivered X seconds or more of total stimulation, otherwise set to 0.
+* `pre_trial_nostim_duration`: int or float, indicates minimum time in seconds of NO stimulation before delivering the first train in a trial. This is applied AFTER trials have been identified by survey bounderies. Optional and can be used if you only want to output trials that have X seconds or more of no stimulation before the trial started, otherwise set to 0.  
+* `post_trial_nostim_duration`: int or float, indicates minimum time in seconds of NO stimulation after delivering the last train in a trial. This is applied AFTER trials have been identified by survey bounderies. Optional and can be used if you only want to output trials that have X seconds or more of no stimulation after the trial ended, otherwise set to 0.
 
      
 ## tools.py
@@ -29,19 +30,19 @@ Custom functions called in "filter.py":
 
 `LoadRawData`: Loads CSV file located in Google Drive according to `patient id`. This CSV contains surveys collected and stimulation delivered during Stage 1 ordered by timestamps. Original can be found here: https://docs.google.com/spreadsheets/d/1h6AoXkKo2ePL8k2CfTTGm9AlZdunyaJ1vZuU82K2gEg/edit?gid=1604189233#gid=1604189233 
 
-`ConfigInputData`: Adds new columns to input data with information that will be used by filter to identify and label trials/blocks.
+`ConfigInputData`: Copies raw dataframe and adds new columns with information that will be used by the code to select and curate trials.
 
-`AssignTags`: Reads through input dataframe and tags each train of stimulation according to `lead_on` OR `channels_on`. It will include `frequency_on`, `amplitude_on` and `train_duration_on` if these are set to True. These tags will be used by the next function to initially chunk trains as part of a discrete trial. 
+`AssignTags`: Reads through input dataframe and tags each train of stimulation according to `lead_on` OR `channels_on`. It will include `frequency_on`, `amplitude_on` and `train_duration_on` if these are set to True. These tags will be used to determine if a trial is eligible. 
 
-`Chunker`: 
+`Chunker`: Chunks trials according to surveys bounderies and uses `AssignTags` to identify eligible trials.
    
-`ConfigOutputData`: Creates output CSV file with trials/blocks that meet user-specified criteria of `total_stim_duration`, `pre_trial_nostim_duration` and `post_trial_nostim_duration`. After selecting qualifying trials/blocks, it will add the closest survey before each trial/block starts and the closest survey after each trial/block ends.  
+`ConfigOutputData`: Creates output CSV file in which each row represents information of a discrete trial. Removes any trials that are part of ERPs, safety testing, induction and tasks.  
 
-`ConditionalOutput`:
+`ConditionalOutput`: If `total_stim_duration`, `pre_trial_nostim_duration` and/or `post_trial_nostim_duration` are different from 0, it will filtered through the output table generated by `ConfigOutputData` and create a new output table with trials that meet the specified requirements.
 
 `LoadNKData`: Load NK annotations in dataframe based on `patient_id` (it considers differences in folder naming).
 
-`AddBoxDisconnects`: Adds a column with disconnects timestamps and a column with reconnects timestamps.
+`AddBoxDisconnects`: Only if `pre_trial_nostim_duration` and `post_trial_nostim_duration` are different from 0, it will look for disconnects and reconnects that happened during `pre_trial_nostim_duration`, during the trial and during `post_trial_nostim_duration`.
 
 ## filter.py
 Code where you can specify user inputs and apply custom functions to obtain output CSV. This is the only code you need to edit and run on the terminal.
@@ -49,7 +50,7 @@ Code where you can specify user inputs and apply custom functions to obtain outp
 ## Output CSV file:
 Output file will be saved in `OUTPUT_DIR` as `{patient_id}_Stage1_FilteredEfficacyTrials_%m%d%Y_%H%M%S`.csv where `%m%d%Y_%H%M%S` indicates date and time of file creation. 
 
-Each row represents a trial/block of stimulation that qualified the filter criteria. There are 22 columns associated with stimulation and depending on `patient_id`, there will be a variable number of columns associated with behavioral scores (surveys). 
+Each row represents a trial of stimulation that qualified the tabulation criteria. There are 19 columns associated with stimulation and depending on `patient_id`, there will be a variable number of columns associated with behavioral scores (surveys). 
 
 ### Columns associated with stimulation parameters applied on each trial:
 
@@ -78,8 +79,8 @@ Each row represents a trial/block of stimulation that qualified the filter crite
 ### Columns associated with surveys identified for each trial:
 
 * `PreTrial_SurveyStart`: Closest survey (start time) detected before `TrialStart`.
-* `PostTrial_SurveyStart`: Closest survey (start time) detected after `TrialStop`.
 * `PreTrial_[SurveyName]`: Closest survey score detected before `TrialStart`.
+* `PostTrial_SurveyStart`: Closest survey (start time) detected after `TrialStop`.
 * `PostTrial_[SurveyName]`: Closest survey score detected after `TrialStop`.
 
 
